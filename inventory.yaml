@@ -1,0 +1,10 @@
+aws:
+  hosts:
+    proxy:
+      ansible_host: home.ec2
+
+home:
+  hosts:
+    server:
+      ansible_host: home.server
+

@@ -1,0 +1,25 @@
+- name: setup reverse proxy
+  hosts: aws
+  become: yes
+  vars_files:
+    - secrets.yml
+  tasks:
+    - name: update
+      ansible.builtin.yum: update_cache=yes
+    - name: install
+      ansible.builtin.yum:
+        name: nginx
+
+- name: setup tunneling via ssh
+  hosts: home
+  become: yes
+  vars_files:
+    - vars.yml
+  vars:
+    ansible_become_pass: "{{ home.become_password }}"
+  tasks:
+    - name: copy key file
+      ansible.builtin.copy:
+        src: ./files/ec2.pem
+        dest: ./.ssh/ec2-ansible.pem
+        mode: '400'
