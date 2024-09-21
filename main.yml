@@ -23,3 +23,18 @@
         src: ./files/ec2.pem
         dest: ./.ssh/ec2.pem
         mode: '400'
+    - name: Copy service
+      become: true
+      ansible.builtin.copy:
+        src: ./files/reverse-tunnel.service
+        dest: /etc/systemd/system/reverse-tunnel.service
+        mode: '400'
+      notify:
+        - Restart reverse tunnel
+  handlers:
+    - name: Restart reverse tunnel
+      become: true
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+        state: restarted
+        name: reverse-tunnel.service
