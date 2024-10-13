@@ -23,7 +23,7 @@
         src: ./files/ec2.pem
         dest: ./.ssh/ec2.pem
         mode: '400'
-    - name: Copy service
+    - name: Copy reverse tunnel service
       become: true
       ansible.builtin.copy:
         src: ./files/reverse-tunnel.service
