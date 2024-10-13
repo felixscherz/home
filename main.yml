@@ -44,3 +44,16 @@
         daemon_reload: true
         state: restarted
         name: reverse-tunnel.service
+
+- name: Setup paperless
+  hosts: home
+  vars_files:
+    - vars.yml
+  vars:
+    ansible_become_pass: "{{ home.become_password }}"
+  tasks:
+    - name: Create cronjob for paperless backup
+      ansible.builtin.cron:
+        name: Paperless backup
+        special_time: hourly
+        job: docker compose -f ~/paperless/docker-compose.yml exec -T webserver document_exporter ../export
