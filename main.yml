@@ -31,6 +31,12 @@
         mode: '400'
       notify:
         - Restart reverse tunnel
+    - name: Create cronjob for paperless backup
+      ansible.builtin.cron:
+        name: Paperless backup
+        special_time: hourly
+        job: docker compose -f ~/paperless/docker-compose.yml exec -T webserver document_exporter ../export
+
   handlers:
     - name: Restart reverse tunnel
       become: true
