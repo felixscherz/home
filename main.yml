@@ -7,9 +7,15 @@
     - name: Update
       ansible.builtin.yum:
         update_cache: true
-    - name: Install
+    - name: Install nginx
       ansible.builtin.yum:
         name: nginx
+    - name: Install certbot
+      ansible.builtin.yum:
+        name: certbot
+    - name: Install python3-certbot-nginx
+      ansible.builtin.yum:
+        name: python3-certbot-nginx
 
 - name: Setup tunneling via ssh
   hosts: home
