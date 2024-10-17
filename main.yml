@@ -1,21 +1,79 @@
+- name: Generate ssh key
+  hosts: home
+  vars_files:
+    - vars.yml
+  vars:
+    ansible_become_pass: "{{ home.become_password }}"
+  tags:
+    - proxy
+  tasks:
+    - name: Generate key pair
+      become: true
+      ansible.builtin.shell:
+        cmd: ssh-keygen -b 2048 -t rsa -f {{ ansible_env.HOME }}/.ssh/id_rsa -q -N /dev/null
+      args:
+        creates: "{{ ansible_env.HOME }}/.ssh/id_rsa"
+    - name: Retrieve public key
+      ansible.builtin.shell:
+        cmd: cat {{ ansible_env.HOME }}/.ssh/id_rsa.pub
+      changed_when: false
+      register: public_key
+
 - name: Setup reverse proxy
   hosts: aws
   become: true
   vars_files:
     - secrets.yml
+  tags:
+    - proxy
   tasks:
+    - name: Add public key
+      ansible.posix.authorized_key:
+        user: root
+        key: "{{ hostvars['server'].public_key.stdout }}"
     - name: Update
-      ansible.builtin.yum:
+      ansible.builtin.package:
         update_cache: true
+    - name: Add nginx user
+      ansible.builtin.user:
+        name: nginx
+        shell: /bin/false
     - name: Install nginx
-      ansible.builtin.yum:
+      ansible.builtin.package:
         name: nginx
     - name: Install certbot
-      ansible.builtin.yum:
+      ansible.builtin.package:
         name: certbot
     - name: Install python3-certbot-nginx
-      ansible.builtin.yum:
+      ansible.builtin.package:
         name: python3-certbot-nginx
+    - name: Copy nginx configuration
+      become: true
+      ansible.builtin.copy:
+        src: ./files/nginx.conf
+        dest: /etc/nginx/nginx.conf
+      notify:
+        - Restart nginx
+    - name: Install certificate
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/certbot
+          - --nginx
+          - -d
+          - home.felixscherz.me
+          - -d
+          - paperless.felixscherz.me
+          - -n
+          - --agree-tos
+          - --email
+          - felixwscherz@gmail.com
+
+  handlers:
+    - name: Restart nginx
+      become: true
+      ansible.builtin.systemd_service:
+        state: restarted
+        name: nginx
 
 - name: Setup tunneling via ssh
   hosts: home
@@ -24,11 +82,11 @@
   vars:
     ansible_become_pass: "{{ home.become_password }}"
   tasks:
-    - name: Copy key file
-      ansible.builtin.copy:
-        src: ./files/ec2.pem
-        dest: ./.ssh/ec2.pem
-        mode: '400'
+    - name: Add to known_hosts
+      become: true
+      ansible.builtin.known_hosts:
+        name: home.felixscherz.me
+        key: home.felixscherz.me ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDwVL90nyFqWjsh22gehiDbvpUiVRnqzG8pkI1CoFSMuxXTkhPhiB9PTH1SJ5BtdJQSyeQ5QyhbTuDC3kCX0arAaaA6991LecVMWq1qeQQ2z2oij+fGvbmygPmqTFtQAffyvbkmSOit9EaWzNFDw4Dius3aTYCxWfyJ22s0QzT3YQf2isdzpqYc1qx2rquc13I/46Mb90OQGbdWWMVSP5kVi+Ytzy7ec+NJdc0pi/usVqfduhXljqh9Z3jHD7aKjqQG4UfSYCl5umLTqlmxz0wnrZfMEpVqaXiN+OzJzOluX2+GjD+WcRJ2ceXh2LXyjg8r/bmqKL4TqVGQxRGnfQ03dq/xTEzXwLs+ozxNZZBZoS2HmY53y7hM3ufAunUA6fUa1+ZOcAvkmIAJ8H0Y6sN/odUI7fA7j3Gfjt4p9GhA+nOmz5p83rrew/Gby6KmdmV+lkWcDcVJn/klwo2U+VzfdjuREng84hMN/IzBZqbCd6B+T+rBlqlhECmVMamzAvM=
     - name: Copy reverse tunnel service
       become: true
       ansible.builtin.copy:
@@ -42,7 +100,6 @@
         name: Paperless backup
         special_time: hourly
         job: docker compose -f ~/paperless/docker-compose.yml exec -T webserver document_exporter ../export
-
   handlers:
     - name: Restart reverse tunnel
       become: true

@@ -1,7 +1,7 @@
 aws:
   hosts:
     proxy:
-      ansible_host: home.ec2
+      ansible_host: home.proxy
 
 home:
   hosts:
