@@ -120,3 +120,107 @@
         name: Paperless backup
         special_time: hourly
         job: docker compose -f ~/paperless/docker-compose.yml exec -T webserver document_exporter ../export
+
+
+- name: Setup VPN client
+  hosts: home
+  tags:
+    - vpn
+  vars_files:
+    - vars.yml
+  vars:
+    server_pubkey: "{{ proxy.wg_pubkey }}"
+    ansible_become_pass: "{{ home.become_password }}"
+  become: true
+  tasks:
+    - name: Install wireguard package
+      ansible.builtin.package:
+        name: wireguard
+        state: present
+        update_cache: yes
+
+    - name: Generate private key
+      ansible.builtin.shell:
+        cmd: umask 077 && wg genkey | tee privatekey | wg pubkey > publickey
+        chdir: /etc/wireguard
+        creates: /etc/wireguard/publickey
+
+    - name: Get public key
+      ansible.builtin.command: cat /etc/wireguard/publickey
+      register: publickey_contents
+      changed_when: False
+
+    - name: set public key fact
+      ansible.builtin.set_fact:
+        pubkey: "{{ publickey_contents.stdout }}"
+
+    - name: Create client wireguard config
+      ansible.builtin.template:
+        dest: /etc/wireguard/wg0.conf
+        src: client_wg0.conf.j2
+        owner: root
+        group: root
+        mode: '0600'
+
+
+- name: Setup VPN server
+  hosts: proxy
+  tags:
+    - vpn
+  vars_files:
+    - vars.yml
+  vars:
+    server_privkey: "{{ proxy.wg_privkey }}"
+    server_pubkey: "{{ proxy.wg_pubkey }}"
+  tasks:
+    - name: Install wireguard package
+      ansible.builtin.package:
+        name: wireguard
+        state: present
+        update_cache: yes
+
+    - name: Create server wireguard config
+      ansible.builtin.template:
+        dest: /etc/wireguard/wg0.conf
+        src: server_wg0.conf.j2
+        owner: root
+        group: root
+        mode: '0600'
+      notify: Restart wireguard
+
+    - name: Enable and persist IP forwarding
+      ansible.builtin.sysctl:
+        name: net.ipv4.ip_forward
+        value: "1"
+        state: present
+        sysctl_set: yes
+        reload: yes
+
+    - name: Start wireguard and enable on boot
+      ansible.builtin.systemd:
+        name: wg-quick@wg0
+        enabled: yes
+        state: started
+  handlers:
+    - name: Restart wireguard
+      ansible.builtin.shell: wg-quick down wg0; wg-quick up wg0
+      args:
+        executable: /bin/bash
+
+
+- name: Start VPN client
+  hosts: home
+  tags:
+    - vpn
+  vars_files:
+    - vars.yml
+  vars:
+    server_pubkey: "{{ proxy.wg_pubkey }}"
+    ansible_become_pass: "{{ home.become_password }}"
+  become: true
+  tasks:
+    - name: Start wireguard and enable on boot
+      ansible.builtin.systemd:
+        name: wg-quick@wg0
+        enabled: yes
+        state: started
