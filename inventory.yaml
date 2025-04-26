@@ -7,4 +7,3 @@ home:
   hosts:
     server:
       ansible_host: home.server
-
