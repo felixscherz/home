@@ -4,6 +4,10 @@ Address = 10.0.0.1/24
 ListenPort = 51820
 PrivateKey = {{ server_privkey }}
 
+MTU = 1200
+PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -t nat -A POSTROUTING -o wg0 -j MASQUERADE
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -t nat -D POSTROUTING -o wg0 -j MASQUERADE
+
 [Peer]
 PublicKey = {{ hostvars['server'].pubkey }}
 AllowedIPs = 10.0.0.8
