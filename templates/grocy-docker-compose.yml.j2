@@ -1,0 +1,18 @@
+# {{ ansible_managed }}
+---
+services:
+  grocy:
+    image: lscr.io/linuxserver/grocy:latest
+    container_name: grocy
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - GROCY_BASE_URL=https://grocy.felixscherz.me
+      - GROCY_CALENDAR_FIRST_DAY_OF_WEEK=1
+      - GROCY_CURRENCY=EUR
+    volumes:
+      - {{ grocy_home }}/config:/config
+    ports:
+      - 9283:80
+    restart: unless-stopped

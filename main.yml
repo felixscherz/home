@@ -66,7 +66,6 @@
           - -d
           - grocy.felixscherz.me
           - -n
-          - --expand
           - --agree-tos
           - --email
           - felixwscherz@gmail.com
@@ -225,4 +224,38 @@
       ansible.builtin.systemd:
         name: wg-quick@wg0
         enabled: yes
+        state: restarted
+
+- name: Setup grocy
+  hosts: home
+  tags:
+    - grocy
+  vars_files:
+    - vars.yml
+  vars:
+    grocy_home: ~/grocy
+  tasks:
+    - name: Create application directory
+      ansible.builtin.file:
+        path: "{{ grocy_home }}"
+        state: directory
+        mode: '0755'
+    - name: Create config directory
+      ansible.builtin.file:
+        path: "{{ grocy_home }}/config"
+        state: directory
+    - name: Copy compose file
+      ansible.builtin.template:
+        src: grocy-docker-compose.yml.j2
+        dest: "{{ grocy_home }}/docker-compose.yml"
+        mode: '0644'
+      notify: Restart docker-compose services
+    - name: Start services
+      community.docker.docker_compose_v2:
+        project_src: ~/grocy
+        state: present
+  handlers:
+    - name: Restart docker-compose services
+      community.docker.docker_compose_v2:
+        project_src: ~/grocy
         state: restarted
