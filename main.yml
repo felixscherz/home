@@ -65,6 +65,8 @@
           - paperless.felixscherz.me
           - -d
           - grocy.felixscherz.me
+          - -d
+          - mealie.felixscherz.me
           - -n
           - --agree-tos
           - --email
@@ -258,4 +260,35 @@
     - name: Restart docker-compose services
       community.docker.docker_compose_v2:
         project_src: ~/grocy
+        state: restarted
+
+
+- name: Setup mealie
+  hosts: home
+  tags:
+    - mealie
+  vars_files:
+    - vars.yml
+  vars:
+    mealie_home: ~/mealie
+  tasks:
+    - name: Create application directory
+      ansible.builtin.file:
+        path: "{{ mealie_home }}"
+        state: directory
+        mode: '0755'
+    - name: Copy compose file
+      ansible.builtin.template:
+        src: mealie-docker-compose.yml
+        dest: "{{ mealie_home }}/docker-compose.yml"
+        mode: '0644'
+      notify: Restart docker-compose services
+    - name: Start services
+      community.docker.docker_compose_v2:
+        project_src: "{{ mealie_home }}"
+        state: present
+  handlers:
+    - name: Restart docker-compose services
+      community.docker.docker_compose_v2:
+        project_src: "{{ mealie_home }}"
         state: restarted
