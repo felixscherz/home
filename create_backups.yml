@@ -1,0 +1,21 @@
+- name: Create paperless backup
+  hosts: home
+  vars_files:
+    - vars.yml
+  vars:
+    ansible_become_pass: "{{ home.become_password }}"
+  tasks:
+    - name: Create paperless backup
+      ansible.builtin.shell:
+        cmd: docker compose exec -T webserver document_exporter ../export && zip ./export.zip ./export && zip -r export.zip export
+        chdir: ~/paperless
+    - name: Create archive
+      community.general.archive:
+        path: ~/paperless/export
+        dest: ~/paperless/export.zip
+        format: zip
+    - name: Synch archive
+      ansible.posix.synchronize:
+        mode: pull
+        src: ~/paperless/export.zip
+        dest: ./export.zip
