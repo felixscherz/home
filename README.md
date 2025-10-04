@@ -100,7 +100,37 @@ This setup implements defense-in-depth security with multiple layers of protecti
 - All services isolated on home network behind NAT and firewall
 - VPN provides controlled access tunnel with restricted IP ranges
 
-#### 5. **Secrets Management**
+#### 5. **SSH Hardening**
+- **Authentication Security**:
+  - Password authentication disabled (SSH keys only)
+  - Root login disabled for enhanced privilege separation
+  - Maximum 3 authentication attempts before disconnect
+- **Protocol Security**:
+  - Only SSHv2 protocol allowed (SSHv1 is cryptographically broken)
+  - Strong encryption ciphers: AES-256-GCM, ChaCha20-Poly1305
+  - Secure key exchange: Curve25519, Diffie-Hellman Group 16
+- **Session Hardening**:
+  - 5-minute keepalive intervals with automatic disconnect
+  - 60-second login timeout prevents hanging connections
+  - Limited concurrent sessions (max 3 per user)
+- **Attack Surface Reduction**:
+  - X11 forwarding, TCP forwarding, and agent forwarding disabled
+  - Compression disabled (prevents CRIME-style attacks)
+  - DNS lookups disabled for faster connections
+  - User environment variables blocked
+
+#### 6. **Intrusion Prevention**
+- **Fail2ban Protection**:
+  - SSH brute force protection: 3 failed attempts → 1 hour ban
+  - nginx attack prevention: HTTP auth failures, bad bots, proxy abuse
+  - Log monitoring across `/var/log/auth.log` and nginx logs
+  - Automatic IP blocking with configurable ban times
+- **Behavioral Analysis**:
+  - Monitors authentication patterns for anomalies
+  - Escalating ban times for repeat offenders
+  - Protection against distributed attacks from multiple IPs
+
+#### 7. **Secrets Management**
 - Ansible Vault encrypts all sensitive credentials and keys
 - WireGuard keys stored securely and never transmitted in plaintext
 - No hardcoded secrets in configuration files
@@ -109,11 +139,11 @@ This setup implements defense-in-depth security with multiple layers of protecti
 
 For enhanced security monitoring, consider implementing:
 
-- **Fail2ban**: Automatic IP blocking for repeated failed attempts
 - **Log aggregation**: Centralized logging for security event analysis
-- **Intrusion detection**: Monitoring for suspicious network activity
-- **Container security scanning**: Regular vulnerability assessments
+- **Advanced intrusion detection**: Beyond fail2ban, monitor for sophisticated attack patterns
+- **Container security scanning**: Regular vulnerability assessments for Docker images
 - **Automated security updates**: Keep all components patched
+- **Security alerting**: Real-time notifications for security events
 
 ### Threat Model
 
@@ -123,6 +153,9 @@ For enhanced security monitoring, consider implementing:
 - Man-in-the-middle attacks (end-to-end encryption)
 - Direct service exposure (VPN tunnel isolation)
 - Credential theft (Ansible Vault encryption)
+- SSH brute force attacks (fail2ban + hardened SSH configuration)
+- Protocol downgrade attacks (forced modern crypto only)
+- Session hijacking (secure session management)
 
 **Additional Considerations:**
 - Regular security audits and penetration testing

@@ -1,0 +1,54 @@
+# {{ ansible_managed }}
+# SSH daemon configuration for enhanced security
+
+# Change default port to reduce automated attacks
+Port 22
+
+# Authentication
+PasswordAuthentication no
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+
+# Root login
+PermitRootLogin no
+
+# Empty passwords
+PermitEmptyPasswords no
+
+# Challenge response authentication
+ChallengeResponseAuthentication no
+
+# Kerberos authentication
+KerberosAuthentication no
+GSSAPIAuthentication no
+
+# Session settings
+ClientAliveInterval 300
+ClientAliveCountMax 2
+LoginGraceTime 60
+MaxAuthTries 3
+MaxSessions 3
+
+# Protocol and encryption
+Protocol 2
+Ciphers aes256-gcm@openssh.com,chacha20-poly1305@openssh.com,aes256-ctr
+MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com
+KexAlgorithms curve25519-sha256@libssh.org,diffie-hellman-group16-sha512
+
+# Misc security settings
+PermitUserEnvironment no
+Compression no
+UseDNS no
+X11Forwarding no
+PrintMotd no
+TCPKeepAlive no
+PermitTunnel no
+AllowAgentForwarding no
+AllowTcpForwarding no
+
+# Logging
+SyslogFacility AUTH
+LogLevel VERBOSE
+
+# Banner (optional)
+# Banner /etc/ssh/ssh-banner

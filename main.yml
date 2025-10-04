@@ -109,6 +109,66 @@
         special_time: hourly
         job: docker compose -f ~/paperless/docker-compose.yml exec -T webserver document_exporter ../export
 
+- name: SSH Hardening and Security
+  hosts: all
+  become: true
+  vars_files:
+    - vars.yml
+  vars:
+    ansible_become_pass: "{% if inventory_hostname in groups['home'] %}{{ home.become_password }}{% endif %}"
+  tasks:
+    - name: Install fail2ban
+      ansible.builtin.package:
+        name: fail2ban
+        state: present
+        update_cache: yes
+
+    - name: Create fail2ban jail configuration
+      ansible.builtin.template:
+        src: fail2ban-jail.local.j2
+        dest: /etc/fail2ban/jail.local
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart fail2ban
+
+    - name: Backup original SSH config
+      ansible.builtin.copy:
+        src: /etc/ssh/sshd_config
+        dest: /etc/ssh/sshd_config.backup
+        remote_src: yes
+        force: no
+
+    - name: Deploy hardened SSH configuration
+      ansible.builtin.template:
+        src: sshd_config.j2
+        dest: /etc/ssh/sshd_config
+        owner: root
+        group: root
+        mode: '0644'
+        backup: yes
+      notify:
+        - Restart sshd
+        - Restart fail2ban
+
+    - name: Start and enable fail2ban
+      ansible.builtin.systemd:
+        name: fail2ban
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: Restart fail2ban
+      ansible.builtin.systemd:
+        name: fail2ban
+        state: restarted
+
+    - name: Restart sshd
+      ansible.builtin.systemd:
+        # Ubuntu/Debian uses 'ssh' service name, RHEL/CentOS uses 'sshd'
+        name: "{{ ssh if inventory_hostname in groups.aws else sshd }}"
+        state: restarted
+
 
 - name: Setup VPN client
   hosts: home

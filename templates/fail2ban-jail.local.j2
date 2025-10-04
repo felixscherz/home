@@ -1,0 +1,62 @@
+# {{ ansible_managed }}
+# Fail2Ban jail configuration
+
+[DEFAULT]
+# Ban time in seconds (10 minutes)
+bantime = 600
+
+# Find time in seconds (10 minutes window)
+findtime = 600
+
+# Number of failures before ban
+maxretry = 5
+
+# Email settings (optional)
+# destemail = your-email@example.com
+# sender = fail2ban@{{ ansible_hostname }}
+# mta = sendmail
+
+# Backend to use for log parsing
+backend = auto
+
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = 3
+bantime = 3600
+
+{% if inventory_hostname in groups['aws'] %}
+[nginx-http-auth]
+enabled = true
+filter = nginx-http-auth
+port = http,https
+logpath = /var/log/nginx/error.log
+maxretry = 3
+bantime = 1800
+
+[nginx-noscript]
+enabled = true
+port = http,https
+filter = nginx-noscript
+logpath = /var/log/nginx/access.log
+maxretry = 6
+bantime = 600
+
+[nginx-badbots]
+enabled = true
+port = http,https
+filter = nginx-badbots
+logpath = /var/log/nginx/access.log
+maxretry = 2
+bantime = 86400
+
+[nginx-noproxy]
+enabled = true
+port = http,https
+filter = nginx-noproxy
+logpath = /var/log/nginx/access.log
+maxretry = 2
+bantime = 86400
+{% endif %}
