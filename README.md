@@ -66,3 +66,66 @@ flowchart TD
 - **No SSH Tunnels**: Eliminated complex SSH reverse tunnels for simplified, reliable connectivity
 
 All application services run locally on the home server, accessible to the internet through the cloud proxy via secure VPN tunnel.
+
+## Security
+
+### Multi-Layer Security Architecture
+
+This setup implements defense-in-depth security with multiple layers of protection:
+
+#### 1. **SSL/TLS Encryption**
+- Let's Encrypt certificates provide end-to-end encryption for all external traffic
+- HSTS headers enforce HTTPS connections and prevent protocol downgrade attacks
+- Certificate auto-renewal via certbot ensures continuous protection
+
+#### 2. **VPN Tunnel Protection**
+- WireGuard provides military-grade encryption for all proxy-to-server communication
+- Only the VPN tunnel endpoint (port 51820) is exposed on the cloud VM
+- All service traffic flows through the encrypted tunnel, never directly exposed
+
+#### 3. **Web Application Security**
+- **Security Headers**: Comprehensive HTTP security headers protect against common web attacks:
+  - `X-Frame-Options`: Prevents clickjacking attacks
+  - `X-Content-Type-Options`: Blocks MIME sniffing attacks
+  - `X-XSS-Protection`: Enables browser XSS filtering
+  - `Content-Security-Policy`: Restricts resource loading to prevent injection attacks
+  - `Referrer-Policy`: Controls referrer information leakage
+- **Rate Limiting**: Multi-tier rate limiting prevents DoS attacks:
+  - General traffic: 10 requests/second with burst capacity
+  - API endpoints: 5 requests/second for sensitive operations
+  - File uploads: 2 requests/second for resource-intensive operations
+
+#### 4. **Network Segmentation**
+- Cloud VM only runs nginx reverse proxy (minimal attack surface)
+- All services isolated on home network behind NAT and firewall
+- VPN provides controlled access tunnel with restricted IP ranges
+
+#### 5. **Secrets Management**
+- Ansible Vault encrypts all sensitive credentials and keys
+- WireGuard keys stored securely and never transmitted in plaintext
+- No hardcoded secrets in configuration files
+
+### Security Monitoring Recommendations
+
+For enhanced security monitoring, consider implementing:
+
+- **Fail2ban**: Automatic IP blocking for repeated failed attempts
+- **Log aggregation**: Centralized logging for security event analysis
+- **Intrusion detection**: Monitoring for suspicious network activity
+- **Container security scanning**: Regular vulnerability assessments
+- **Automated security updates**: Keep all components patched
+
+### Threat Model
+
+**Protected Against:**
+- DDoS attacks (rate limiting + cloud infrastructure)
+- Web application attacks (security headers + WAF-like protections)
+- Man-in-the-middle attacks (end-to-end encryption)
+- Direct service exposure (VPN tunnel isolation)
+- Credential theft (Ansible Vault encryption)
+
+**Additional Considerations:**
+- Regular security audits and penetration testing
+- Keep all services and dependencies updated
+- Monitor logs for suspicious activity
+- Implement backup and disaster recovery procedures
