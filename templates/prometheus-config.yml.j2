@@ -1,0 +1,130 @@
+# {{ ansible_managed }}
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'home-infrastructure'
+
+rule_files:
+  - "alert_rules.yml"
+
+scrape_configs:
+  # System metrics - Home server
+  - job_name: 'node-home'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'home-server'
+      - target_label: environment
+        replacement: 'home'
+
+  # Container metrics
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'home-server'
+      - target_label: environment
+        replacement: 'home'
+
+  # Docker daemon metrics
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['docker-socket-proxy:2375']
+    metrics_path: /metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'home-server'
+      - target_label: environment
+        replacement: 'home'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Home Assistant metrics (if available)
+  - job_name: 'home-assistant'
+    static_configs:
+      - targets: ['10.0.0.8:8123']
+    metrics_path: /api/prometheus
+    scrape_interval: 30s
+    scheme: http
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'home-assistant'
+      - target_label: environment
+        replacement: 'home'
+    # Optional: Add bearer token authentication if configured
+    # authorization:
+    #   type: Bearer
+    #   credentials: YOUR_HOME_ASSISTANT_TOKEN
+
+  # Cloud VM metrics (via VPN)
+  - job_name: 'node-cloud'
+    static_configs:
+      - targets: ['10.0.0.1:9100']  # Cloud VM IP in VPN
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'cloud-proxy'
+      - target_label: environment
+        replacement: 'cloud'
+
+  # nginx metrics (if nginx_exporter is installed on cloud VM)
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['10.0.0.1:9113']  # nginx_exporter port
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'cloud-proxy'
+      - target_label: environment
+        replacement: 'cloud'
+
+  # Paperless metrics (via custom exporter)
+  - job_name: 'paperless'
+    static_configs:
+      - targets: ['paperless-exporter:9163']
+    metrics_path: /metrics
+    scrape_interval: 60s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'paperless'
+      - target_label: environment
+        replacement: 'home'
+
+  # Grocy metrics (database-based custom exporter)
+  - job_name: 'grocy'
+    static_configs:
+      - targets: ['10.0.0.8:9283']
+    metrics_path: /metrics
+    scrape_interval: 60s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'grocy'
+      - target_label: environment
+        replacement: 'home'
+
+  # Mealie metrics
+  # disabled because Mealie exposes HTML statistics at that endpoint
+  # we would need a custom Mealie exporter
+  # - job_name: 'mealie'
+  #   static_configs:
+  #     - targets: ['10.0.0.8:9925']
+  #   metrics_path: /api/app/about/statistics
+  #   scrape_interval: 60s
+  #   relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: instance
+  #       replacement: 'mealie'
+  #     - target_label: environment
+  #       replacement: 'home'

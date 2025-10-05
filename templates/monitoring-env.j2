@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+# Environment variables for monitoring stack
+
+# Paperless API token for metrics exporter
+PAPERLESS_TOKEN={{ home.paperless_token }}
+
+# Optional: Home Assistant token (add to vars.yml if needed)
+# HA_TOKEN={{ home.ha_token | default('') }}

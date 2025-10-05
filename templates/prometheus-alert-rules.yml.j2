@@ -1,0 +1,65 @@
+# {{ ansible_managed }}
+# Basic alerting rules for home infrastructure monitoring
+
+groups:
+  - name: infrastructure.rules
+    rules:
+      # Node down alerts
+      - alert: InstanceDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{% raw %}Instance {{ $labels.instance }} down{% endraw %}"
+          description: "{% raw %}{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 5 minutes.{% endraw %}"
+
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{% raw %}High CPU usage on {{ $labels.instance }}{% endraw %}"
+          description: "{% raw %}CPU usage is above 80% for more than 10 minutes on {{ $labels.instance }}{% endraw %}"
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{% raw %}High memory usage on {{ $labels.instance }}{% endraw %}"
+          description: "{% raw %}Memory usage is above 90% on {{ $labels.instance }}{% endraw %}"
+
+      # Low disk space
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{% raw %}Low disk space on {{ $labels.instance }}{% endraw %}"
+          description: "{% raw %}Disk space is below 10% on {{ $labels.instance }} filesystem {{ $labels.mountpoint }}{% endraw %}"
+
+      # Container restart alerts
+      - alert: ContainerRestarted
+        expr: increase(container_start_time_seconds[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{% raw %}Container {{ $labels.name }} restarted{% endraw %}"
+          description: "{% raw %}Container {{ $labels.name }} on {{ $labels.instance }} has restarted{% endraw %}"
+
+      # High container memory usage
+      - alert: ContainerHighMemory
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{% raw %}Container {{ $labels.name }} high memory usage{% endraw %}"
+          description: "{% raw %}Container {{ $labels.name }} memory usage is above 90%{% endraw %}"

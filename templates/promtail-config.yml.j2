@@ -1,0 +1,113 @@
+# {{ ansible_managed }}
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # System logs
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: varlogs
+          host: home-server
+          __path__: /var/log/*log
+
+  # nginx logs from cloud proxy (if mounted)
+  - job_name: nginx
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          host: cloud-proxy
+          service: nginx
+          __path__: /var/log/nginx/*log
+
+  # Auth logs
+  - job_name: auth
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: auth
+          host: home-server
+          __path__: /var/log/auth.log
+
+  # Syslog
+  - job_name: syslog
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: syslog
+          host: home-server
+          __path__: /var/log/syslog
+
+  # Docker container logs
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: label
+            values: ["logging=promtail"]
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'job'
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'stream'
+      - target_label: 'host'
+        replacement: 'home-server'
+
+  # All Docker containers (fallback)
+  - job_name: docker-all
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'job'
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'stream'
+      - target_label: 'host'
+        replacement: 'home-server'
+
+pipeline_stages:
+  - match:
+      selector: '{job="nginx"}'
+      stages:
+        - regex:
+            expression: '^(?P<remote_addr>[\w\.]+) - (?P<remote_user>[^ ]*) \[(?P<time_local>.*)\] "(?P<method>[^ ]*) (?P<path>[^ ]*) (?P<protocol>[^ ]*)" (?P<status>[\d]+) (?P<body_bytes_sent>[\d]+) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)"'
+        - labels:
+            remote_addr:
+            method:
+            path:
+            status:
+            http_user_agent:
+
+  - match:
+      selector: '{job="auth"}'
+      stages:
+        - regex:
+            expression: '^(?P<timestamp>\w+\s+\d+\s+\d+:\d+:\d+) (?P<hostname>\S+) (?P<service>\S+): (?P<message>.*)'
+        - labels:
+            service:
+        - timestamp:
+            source: timestamp
+            format: 'Jan 02 15:04:05'

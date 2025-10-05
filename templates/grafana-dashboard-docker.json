@@ -1,0 +1,100 @@
+{
+  "id": null,
+  "title": "Docker Containers",
+  "tags": ["docker", "containers"],
+  "timezone": "browser",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Container CPU Usage",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "rate(container_cpu_usage_seconds_total[5m]) * 100",
+          "legendFormat": "{% raw %}{{name}}{% endraw %}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": 2,
+      "title": "Container Memory Usage",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "container_memory_usage_bytes / 1024 / 1024",
+          "legendFormat": "{% raw %}{{name}}{% endraw %}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      }
+    },
+    {
+      "id": 3,
+      "title": "Container Network I/O",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "rate(container_network_receive_bytes_total[5m])",
+          "legendFormat": "{% raw %}{{name}} - RX{% endraw %}"
+        },
+        {
+          "expr": "rate(container_network_transmit_bytes_total[5m])",
+          "legendFormat": "{% raw %}{{name}} - TX{% endraw %}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "binBps"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      }
+    },
+    {
+      "id": 4,
+      "title": "Container Restart Count",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "container_start_time_seconds",
+          "legendFormat": "{% raw %}{{name}}{% endraw %}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      }
+    }
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "5s"
+}

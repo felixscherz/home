@@ -1,3 +1,4 @@
+---
 - name: Generate ssh key
   hosts: home
   vars_files:
@@ -67,6 +68,9 @@
           - grocy.felixscherz.me
           - -d
           - mealie.felixscherz.me
+          - -d
+          - grafana.felixscherz.me
+          - --expand
           - -n
           - --agree-tos
           - --email
@@ -95,7 +99,6 @@
         job: "sudo rtcwake -m mem -s 28800"
 
 
-
 - name: Setup paperless
   hosts: home
   vars_files:
@@ -107,7 +110,7 @@
       ansible.builtin.cron:
         name: Paperless backup
         special_time: hourly
-        job: docker compose -f ~/paperless/docker-compose.yml exec -T webserver document_exporter ../export
+        job: docker compose -f ~/paperless/docker-compose.yml exec -T webserver document_exporter ../expor
 
 - name: SSH Hardening and Security
   hosts: all
@@ -166,11 +169,11 @@
     - name: Restart sshd
       ansible.builtin.systemd:
         # Ubuntu/Debian uses 'ssh' service name, RHEL/CentOS uses 'sshd'
-        name: "{{ ssh if inventory_hostname in groups.aws else sshd }}"
+        name: "{{ 'ssh' if inventory_hostname in groups.aws else 'sshd' }}"
         state: restarted
 
 
-- name: Setup VPN client
+- name: Setup VPN clien
   hosts: home
   tags:
     - vpn
@@ -198,7 +201,7 @@
       register: publickey_contents
       changed_when: False
 
-    - name: set public key fact
+    - name: set public key fac
       ansible.builtin.set_fact:
         pubkey: "{{ publickey_contents.stdout }}"
 
@@ -244,7 +247,7 @@
         sysctl_set: yes
         reload: yes
 
-    - name: Start wireguard and enable on boot
+    - name: Start wireguard and enable on boo
       ansible.builtin.systemd:
         name: wg-quick@wg0
         enabled: yes
@@ -255,7 +258,7 @@
         state: restarted
         name: wg-quick@wg0
 
-- name: Start VPN client
+- name: Start VPN clien
   hosts: home
   tags:
     - vpn
@@ -266,7 +269,7 @@
     ansible_become_pass: "{{ home.become_password }}"
   become: true
   tasks:
-    - name: Start wireguard and enable on boot
+    - name: Start wireguard and enable on boo
       ansible.builtin.systemd:
         name: wg-quick@wg0
         enabled: yes
@@ -335,4 +338,158 @@
     - name: Restart docker-compose services
       community.docker.docker_compose_v2:
         project_src: "{{ mealie_home }}"
+        state: restarted
+
+- name: Setup monitoring stack
+  hosts: home
+  tags:
+    - monitoring
+  vars_files:
+    - vars.yml
+  vars:
+    ansible_become_pass: "{{ home.become_password }}"
+    monitoring_home: ~/monitoring
+  become: true
+  tasks:
+    - name: Install node exporter on cloud VM
+      delegate_to: proxy
+      become: true
+      block:
+        - name: Create node_exporter user
+          ansible.builtin.user:
+            name: node_exporter
+            shell: /bin/false
+            home: /
+            create_home: false
+            system: true
+
+        - name: Download and install node_exporter
+          ansible.builtin.unarchive:
+            src: https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-1.6.1.linux-amd64.tar.gz
+            dest: /tmp
+            remote_src: true
+            creates: /tmp/node_exporter-1.6.1.linux-amd64
+
+        - name: Copy node_exporter binary
+          ansible.builtin.copy:
+            src: /tmp/node_exporter-1.6.1.linux-amd64/node_exporter
+            dest: /usr/local/bin/node_exporter
+            remote_src: true
+            owner: node_exporter
+            group: node_exporter
+            mode: '0755'
+
+        - name: Create node_exporter systemd service
+          ansible.builtin.copy:
+            content: |
+              [Unit]
+              Description=Node Exporter
+              Wants=network-online.targe
+              After=network-online.targe
+
+              [Service]
+              User=node_exporter
+              Group=node_exporter
+              Type=simple
+              ExecStart=/usr/local/bin/node_exporter --collector.systemd
+
+              [Install]
+              WantedBy=multi-user.targe
+            dest: /etc/systemd/system/node_exporter.service
+            mode: '0644'
+          notify:
+            - Reload systemd
+            - Start node_exporter
+
+        - name: Enable and start node_exporter
+          ansible.builtin.systemd:
+            name: node_exporter
+            enabled: true
+            state: started
+            daemon_reload: true
+
+    - name: Create monitoring directory structure
+      become: false
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ monitoring_home }}"
+        - "{{ monitoring_home }}/prometheus/config"
+        - "{{ monitoring_home }}/grafana/config"
+        - "{{ monitoring_home }}/grafana/config/provisioning"
+        - "{{ monitoring_home }}/grafana/config/provisioning/datasources"
+        - "{{ monitoring_home }}/grafana/config/provisioning/dashboards"
+        - "{{ monitoring_home }}/grafana/dashboards"
+        - "{{ monitoring_home }}/loki/config"
+        - "{{ monitoring_home }}/promtail/config"
+
+    - name: Copy custom exporters
+      become: false
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ monitoring_home }}/"
+        mode: '0755'
+      loop:
+        - exporters/
+
+    - name: Copy monitoring configuration files
+      become: false
+      ansible.builtin.template:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: '0644'
+      loop:
+        - src: monitoring-docker-compose.yml.j2
+          dest: "{{ monitoring_home }}/docker-compose.yml"
+        - src: prometheus-config.yml.j2
+          dest: "{{ monitoring_home }}/prometheus/config/prometheus.yml"
+        - src: prometheus-alert-rules.yml.j2
+          dest: "{{ monitoring_home }}/prometheus/config/alert_rules.yml"
+        - src: loki-config.yml.j2
+          dest: "{{ monitoring_home }}/loki/config/loki-config.yaml"
+        - src: promtail-config.yml.j2
+          dest: "{{ monitoring_home }}/promtail/config/promtail-config.yaml"
+        - src: grafana.ini.j2
+          dest: "{{ monitoring_home }}/grafana/config/grafana.ini"
+        - src: grafana-datasources.yml.j2
+          dest: "{{ monitoring_home }}/grafana/config/provisioning/datasources/prometheus.yml"
+        - src: grafana-dashboards.yml.j2
+          dest: "{{ monitoring_home }}/grafana/config/provisioning/dashboards/dashboards.yml"
+        - src: grafana-dashboard-overview.json
+          dest: "{{ monitoring_home }}/grafana/dashboards/overview.json"
+        - src: grafana-dashboard-docker.json
+          dest: "{{ monitoring_home }}/grafana/dashboards/docker.json"
+      notify: Restart monitoring stack
+
+    - name: Create .env file with secrets
+      become: false
+      ansible.builtin.template:
+        src: monitoring-env.j2
+        dest: "{{ monitoring_home }}/.env"
+        mode: '0600'
+      notify: Restart monitoring stack
+
+
+    - name: Start monitoring stack
+      become: false
+      community.docker.docker_compose_v2:
+        project_src: "{{ monitoring_home }}"
+        state: present
+
+  handlers:
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Start node_exporter
+      ansible.builtin.systemd:
+        name: node_exporter
+        state: started
+
+    - name: Restart monitoring stack
+      become: false
+      community.docker.docker_compose_v2:
+        project_src: "{{ monitoring_home }}"
         state: restarted

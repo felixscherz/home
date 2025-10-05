@@ -162,3 +162,135 @@ For enhanced security monitoring, consider implementing:
 - Keep all services and dependencies updated
 - Monitor logs for suspicious activity
 - Implement backup and disaster recovery procedures
+
+## Monitoring & Observability
+
+### Overview
+
+The infrastructure includes comprehensive monitoring using the modern observability stack:
+
+- **Prometheus**: Metrics collection and alerting engine
+- **Grafana**: Visualization dashboards and alerting interface
+- **Loki**: Log aggregation and analysis
+- **Promtail**: Log shipping agent
+- **Node Exporter**: System metrics collection
+- **cAdvisor**: Container metrics collection
+
+### Architecture
+
+```mermaid
+flowchart TB
+    subgraph home_server[Home Server]
+        subgraph monitoring[Monitoring Stack]
+            prometheus[Prometheus<br/>:9090]
+            grafana[Grafana<br/>:3000]
+            loki[Loki<br/>:3100]
+        end
+
+        subgraph exporters[Metric Exporters]
+            node_exporter[Node Exporter<br/>:9100]
+            cadvisor[cAdvisor<br/>:8080]
+            promtail[Promtail<br/>:9080]
+        end
+
+        subgraph services[Application Services]
+            homeassistant[Home Assistant]
+            paperless[Paperless]
+            grocy[Grocy]
+            mealie[Mealie]
+        end
+    end
+
+    subgraph external[External Monitoring]
+        ha_exporter[HA Custom Exporter<br/>:8001]
+        paperless_exporter[Paperless Exporter<br/>:8002]
+    end
+
+    node_exporter --> prometheus
+    cadvisor --> prometheus
+    ha_exporter --> prometheus
+    paperless_exporter --> prometheus
+
+    promtail --> loki
+    prometheus --> grafana
+    loki --> grafana
+
+    services --> promtail
+    homeassistant --> ha_exporter
+    paperless --> paperless_exporter
+
+    style monitoring fill:#e8f5e8
+    style exporters fill:#fff3e0
+    style external fill:#f3e5f5
+```
+
+### Key Features
+
+#### **Metrics Collection**
+- **System Metrics**: CPU, memory, disk, network usage via Node Exporter
+- **Container Metrics**: Docker container resource usage, restarts, health via cAdvisor
+- **Application Metrics**: Custom exporters for Home Assistant and Paperless services
+- **Infrastructure Metrics**: Network connectivity, service uptime, response times
+
+#### **Log Aggregation**
+- **Centralized Logging**: All container logs collected by Promtail and stored in Loki
+- **Structured Querying**: LogQL queries for advanced log analysis and debugging
+- **Retention Policies**: Configurable log retention to manage storage usage
+
+#### **Alerting System**
+- **Multi-tier Alerts**: Critical, warning, and info level alerts based on severity
+- **Comprehensive Coverage**:
+  - Node down detection (5-minute threshold)
+  - High CPU usage (>80% for 10+ minutes)
+  - High memory usage (>90% for 5+ minutes)
+  - Low disk space (<10% available)
+  - Container restart monitoring
+  - Container memory limits (>90% of allocation)
+
+#### **Visualization**
+- **Pre-built Dashboards**: Docker containers and infrastructure overview
+- **Real-time Monitoring**: Live metrics with configurable refresh intervals
+- **Historical Analysis**: Trending and capacity planning capabilities
+
+### Access & Configuration
+
+#### **Dashboard Access**
+- **Grafana**: Available at `http://server:3000` (or via reverse proxy)
+- **Prometheus**: Available at `http://server:9090` for direct metric queries
+- **Default Credentials**: Configured via Ansible variables
+
+#### **Data Sources**
+- **Prometheus**: `http://prometheus:9090` (configured automatically)
+- **Loki**: `http://loki:3100` (configured automatically)
+
+#### **Alert Routing**
+- **Prometheus Alertmanager**: Built-in alert evaluation and routing
+- **Grafana Alerts**: Visual alert management and notification channels
+- **Extensible**: Ready for integration with external notification systems (email, Slack, etc.)
+
+### Maintenance
+
+#### **Storage Management**
+- **Metrics Retention**: 15-day default retention for Prometheus data
+- **Log Retention**: 7-day default retention for Loki logs
+- **Volume Management**: Persistent Docker volumes for data durability
+
+#### **Performance Tuning**
+- **Resource Limits**: Configured memory and CPU limits for all monitoring containers
+- **Scrape Intervals**: Optimized collection intervals (15s default) for balance of accuracy and performance
+- **Query Optimization**: Efficient queries and dashboard design to minimize resource usage
+
+### Extending Monitoring
+
+#### **Adding New Exporters**
+1. Deploy exporter as Docker container or system service
+2. Add scrape target to `prometheus-config.yml.j2`
+3. Create custom dashboards in Grafana
+4. Define relevant alert rules in `prometheus-alert-rules.yml.j2`
+
+#### **Custom Metrics**
+- Application-specific metrics via custom exporters (examples: Home Assistant, Paperless)
+- Integration with service APIs for business logic monitoring
+- Support for push-based metrics via Prometheus Pushgateway (optional)
+
+This monitoring setup provides comprehensive visibility into system health, performance trends, and early warning for potential issues across the entire home infrastructure.
