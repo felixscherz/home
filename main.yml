@@ -493,3 +493,87 @@
       community.docker.docker_compose_v2:
         project_src: "{{ monitoring_home }}"
         state: restarted
+
+- name: Setup Home Assistant IP Forwarding
+  hosts: home
+  tags:
+    - homeassistant-forward
+  vars_files:
+    - vars.yml
+  vars:
+    ansible_become_pass: "{{ home.become_password }}"
+  become: true
+  tasks:
+    - name: Enable IP forwarding on home server
+      ansible.builtin.sysctl:
+        name: net.ipv4.ip_forward
+        value: "1"
+        state: present
+        sysctl_set: yes
+        reload: yes
+
+    - name: Install iptables-persistent for rule persistence
+      ansible.builtin.package:
+        name: iptables-persistent
+        state: present
+        update_cache: yes
+
+    - name: Create Home Assistant iptables script
+      ansible.builtin.template:
+        src: homeassistant-iptables.j2
+        dest: /usr/local/bin/homeassistant-iptables.sh
+        owner: root
+        group: root
+        mode: '0755'
+      notify: Apply Home Assistant iptables rules
+
+    - name: Apply Home Assistant iptables rules
+      ansible.builtin.command: /usr/local/bin/homeassistant-iptables.sh
+      register: iptables_result
+      changed_when: true
+
+    - name: Save iptables rules
+      ansible.builtin.shell: |
+        iptables-save > /etc/iptables/rules.v4
+      notify: Restart networking
+
+    - name: Create systemd service for Home Assistant iptables
+      ansible.builtin.copy:
+        content: |
+          [Unit]
+          Description=Home Assistant IP Forwarding Rules
+          After=network.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/bin/homeassistant-iptables.sh
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/homeassistant-iptables.service
+        owner: root
+        group: root
+        mode: '0644'
+      notify:
+        - Reload systemd
+        - Enable homeassistant iptables service
+
+  handlers:
+    - name: Apply Home Assistant iptables rules
+      ansible.builtin.command: /usr/local/bin/homeassistant-iptables.sh
+
+    - name: Restart networking
+      ansible.builtin.systemd:
+        name: networking
+        state: restarted
+
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Enable homeassistant iptables service
+      ansible.builtin.systemd:
+        name: homeassistant-iptables
+        enabled: true
+        state: started

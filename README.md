@@ -32,40 +32,64 @@ flowchart TD
             direction TB
             wg_client[WireGuard Client<br/>10.0.0.8]
             docker[Docker Engine]
+            ip_forward[IP Forwarding<br/>iptables]
 
             subgraph services[Services]
-                ha[Home Assistant<br/>:8123]
                 paperless[Paperless<br/>:8000]
                 grocy[Grocy<br/>:9283]
                 mealie[Mealie<br/>:9925]
             end
         end
+
+        subgraph ha_vm[Home Assistant VM - 192.168.0.182]
+            direction TB
+            ha[Home Assistant<br/>:8123]
+        end
     end
 
     Internet --> nginx
-    nginx -.->|home.felixscherz.me<br/>10.0.0.8:8123| ha
+    nginx -.->|home.felixscherz.me<br/>10.0.0.8:8123| ip_forward
     nginx -.->|paperless.felixscherz.me<br/>10.0.0.8:8000| paperless
     nginx -.->|grocy.felixscherz.me<br/>10.0.0.8:9283| grocy
     nginx -.->|mealie.felixscherz.me<br/>10.0.0.8:9925| mealie
 
     wg_server ===|Encrypted VPN Tunnel| wg_client
+    ip_forward -.->|192.168.0.182:8123| ha
     docker --> services
     homeserver --> router
+    ha_vm --> router
 
     style nginx fill:#e1f5fe
     style wg_server fill:#f3e5f5
     style wg_client fill:#f3e5f5
     style services fill:#e8f5e8
+    style ip_forward fill:#fff3e0
+    style ha fill:#ffebee
 ```
 
 ### Key Components
 
 - **Cloud VM**: Runs nginx reverse proxy with SSL termination and WireGuard VPN server
-- **Home Server**: Hosts all services in Docker containers, connected via WireGuard client
+- **Home Server**: Hosts Docker services and acts as IP forwarding gateway, connected via WireGuard client
+- **Home Assistant VM**: Separate VirtualBox VM running Home Assistant, accessible via IP forwarding
 - **VPN Tunnel**: Encrypted connection (10.0.0.0/24) allows proxy to reach home services
+- **IP Forwarding**: Home server forwards Home Assistant traffic from VPN to VM using iptables
 - **No SSH Tunnels**: Eliminated complex SSH reverse tunnels for simplified, reliable connectivity
 
-All application services run locally on the home server, accessible to the internet through the cloud proxy via secure VPN tunnel.
+Most application services run in Docker on the home server, while Home Assistant runs in a separate VM, all accessible through the cloud proxy via secure VPN tunnel.
+
+### Home Assistant Architecture Options
+
+**Current Implementation**: IP Forwarding
+- Home Assistant runs in VirtualBox VM (192.168.0.182:8123)
+- Home server forwards VPN traffic (10.0.0.8:8123) to VM using iptables
+- Quick to implement, minimal changes required
+
+**Future Upgrade Path**: Direct VPN Connection
+- Install WireGuard directly on Home Assistant VM
+- Assign VM its own VPN IP (e.g., 10.0.0.9)
+- Direct encrypted connection, no forwarding needed
+- More resilient architecture, eliminates single point of failure
 
 ## Security
 
@@ -294,3 +318,74 @@ flowchart TB
 - Support for push-based metrics via Prometheus Pushgateway (optional)
 
 This monitoring setup provides comprehensive visibility into system health, performance trends, and early warning for potential issues across the entire home infrastructure.
+
+## Home Assistant VM Configuration
+
+### Current Setup
+
+Home Assistant runs in a VirtualBox VM on the home server with the following configuration:
+- **VM IP**: 192.168.0.182:8123
+- **Network**: Bridged to home network (192.168.0.0/24)
+- **Access Method**: IP forwarding through home server
+
+### IP Forwarding Implementation
+
+The home server acts as a gateway, forwarding Home Assistant traffic from the VPN to the VM:
+
+```bash
+# Traffic Flow
+Internet → nginx (proxy) → VPN tunnel → Home Server (10.0.0.8:8123) → VM (192.168.0.182:8123)
+```
+
+**Ansible Implementation:**
+- Uses `homeassistant-iptables.j2` template for iptables rules
+- Enables IP forwarding on home server
+- Configures DNAT, SNAT, and FORWARD rules
+- Rules persist across reboots via systemd service
+
+### Migration to Direct VPN Access
+
+For improved reliability and architecture, consider migrating to direct VPN access:
+
+1. **Install WireGuard on VM**:
+   ```bash
+   apt update && apt install wireguard
+   ```
+
+2. **Generate VM Keys**:
+   ```bash
+   cd /etc/wireguard
+   umask 077
+   wg genkey | tee privatekey | wg pubkey > publickey
+   ```
+
+3. **Update Server Config** (`templates/server_wg0.conf.j2`):
+   ```ini
+   [Peer]
+   PublicKey = <VM_PUBLIC_KEY>
+   AllowedIPs = 10.0.0.9
+   ```
+
+4. **Create VM Config**:
+   ```ini
+   [Interface]
+   Address = 10.0.0.9/32
+   PrivateKey = <VM_PRIVATE_KEY>
+
+   [Peer]
+   PublicKey = <SERVER_PUBLIC_KEY>
+   Endpoint = home.felixscherz.me:51820
+   AllowedIPs = 10.0.0.0/24
+   PersistentKeepalive = 25
+   ```
+
+5. **Update nginx** to point to `10.0.0.9:8123`
+
+6. **Remove IP forwarding rules** from home server
+
+**Benefits of Direct VPN:**
+- Eliminates single point of failure
+- Direct encrypted connection
+- Simplified network path
+- Better performance (no forwarding overhead)
+- Consistent with existing architecture principles

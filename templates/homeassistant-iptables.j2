@@ -1,0 +1,30 @@
+#!/bin/bash
+# {{ ansible_managed }}
+# Home Assistant VM IP Forwarding Rules
+
+# Variables
+HA_VM_IP="{{ homeassistant.vm_ip }}"
+HA_VM_PORT="{{ homeassistant.vm_port }}"
+VPN_INTERFACE="{{ homeassistant.vpn_interface }}"
+LAN_INTERFACE="{{ homeassistant.lan_interface }}"
+
+# Enable IP forwarding
+echo 1 > /proc/sys/net/ipv4/ip_forward
+
+# Clear existing rules for Home Assistant (in case of rerun)
+iptables -t nat -D PREROUTING -i $VPN_INTERFACE -p tcp --dport $HA_VM_PORT -j DNAT --to-destination $HA_VM_IP:$HA_VM_PORT 2>/dev/null || true
+iptables -t nat -D POSTROUTING -o $LAN_INTERFACE -d $HA_VM_IP -p tcp --dport $HA_VM_PORT -j MASQUERADE 2>/dev/null || true
+iptables -D FORWARD -i $VPN_INTERFACE -o $LAN_INTERFACE -d $HA_VM_IP -p tcp --dport $HA_VM_PORT -j ACCEPT 2>/dev/null || true
+iptables -D FORWARD -i $LAN_INTERFACE -o $VPN_INTERFACE -s $HA_VM_IP -p tcp --sport $HA_VM_PORT -j ACCEPT 2>/dev/null || true
+
+# DNAT: Incoming traffic from VPN to Home Assistant VM
+iptables -t nat -A PREROUTING -i $VPN_INTERFACE -p tcp --dport $HA_VM_PORT -j DNAT --to-destination $HA_VM_IP:$HA_VM_PORT
+
+# SNAT: Masquerade outgoing traffic to Home Assistant VM
+iptables -t nat -A POSTROUTING -o $LAN_INTERFACE -d $HA_VM_IP -p tcp --dport $HA_VM_PORT -j MASQUERADE
+
+# FORWARD: Allow traffic through
+iptables -A FORWARD -i $VPN_INTERFACE -o $LAN_INTERFACE -d $HA_VM_IP -p tcp --dport $HA_VM_PORT -j ACCEPT
+iptables -A FORWARD -i $LAN_INTERFACE -o $VPN_INTERFACE -s $HA_VM_IP -p tcp --sport $HA_VM_PORT -j ACCEPT
+
+echo "Home Assistant IP forwarding rules applied successfully"
