@@ -1,0 +1,13 @@
+# {{ ansible_managed }}
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    enp1s0:
+      dhcp4: true
+  wifis:
+    wlx00265a80bd9b:
+      dhcp4: true
+      access-points:
+        "{{ home.wifi.ssid }}":
+          password: {{ home.wifi.password }}

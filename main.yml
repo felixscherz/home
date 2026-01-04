@@ -1,4 +1,18 @@
 ---
+- name: Setup networking
+  hosts: home
+  vars_files:
+    - vars.yml
+  vars:
+    ansible_become_pass: "{{ home.become_password }}"
+  tasks:
+    - name: Copy netplan configuration
+      become: true
+      ansible.builtin.copy:
+        src: netplan.yml.j2
+        dest: /etc/netplan/02-netcfg.yaml
+        # TODO: this needs to apply the netplan after changes
+
 - name: Generate ssh key
   hosts: home
   vars_files:
