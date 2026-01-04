@@ -1,5 +1,11 @@
 # homeassistant
 
+## Run ansible playbook
+
+```sh
+ansible-playbook -i inventory.yaml --ask-vault-pass main.yml
+```
+
 ## Setting up homekit bridge
 
 In order to pair iOS devices with homeassistant I need to setup a [HomeKit
