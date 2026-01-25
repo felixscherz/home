@@ -111,6 +111,7 @@
         hour: "22"
         user: root
         job: "sudo rtcwake -m mem -s 28800"
+        state: absent
 
 
 - name: Setup paperless
