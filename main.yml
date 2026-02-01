@@ -355,6 +355,54 @@
         project_src: "{{ mealie_home }}"
         state: restarted
 
+
+- name: Setup OpenCode server
+  hosts: home
+  tags:
+    - opencode
+  vars_files:
+    - vars.yml
+  vars:
+    ansible_become_pass: "{{ home.become_password }}"
+    opencode_home: /home/felix/repositories
+  become: true
+  tasks:
+    - name: Create working directory
+      ansible.builtin.file:
+        path: "{{ opencode_home }}"
+        state: directory
+        mode: '0755'
+        owner: felix
+        group: felix
+
+    - name: Create systemd service file
+      ansible.builtin.template:
+        src: opencode.service.j2
+        dest: /etc/systemd/system/opencode.service
+        mode: '0644'
+      notify:
+        - Reload systemd
+        - Enable opencode service
+
+    - name: Start opencode service
+      ansible.builtin.systemd:
+        name: opencode
+        state: started
+        enabled: yes
+        daemon_reload: yes
+
+  handlers:
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Enable opencode service
+      ansible.builtin.systemd:
+        name: opencode
+        enabled: yes
+        state: started
+
+
 - name: Setup monitoring stack
   hosts: home
   tags:
