@@ -1,0 +1,75 @@
+---
+- name: Restart Home Assistant OS VM
+  hosts: home
+  vars_files:
+    - vars.yml
+  vars:
+    ansible_become_pass: "{{ home.become_password }}"
+    vm_name: "hass-os"
+    force_shutdown: "{{ force | default(false) }}"
+    shutdown_wait_time: 30
+    startup_wait_time: 15
+  tasks:
+    - name: Check if VM is running
+      ansible.builtin.shell:
+        cmd: VBoxManage list runningvms | grep -q "{{ vm_name }}"
+      register: vm_running
+      changed_when: false
+      failed_when: false
+
+    - name: Display VM status
+      ansible.builtin.debug:
+        msg: "VM '{{ vm_name }}' is {{ 'running' if vm_running.rc == 0 else 'not running' }}"
+
+    - name: Shutdown VM gracefully
+      ansible.builtin.command:
+        cmd: VBoxManage controlvm "{{ vm_name }}" acpipowerbutton
+      when: vm_running.rc == 0 and not force_shutdown
+      register: graceful_shutdown
+      changed_when: true
+      failed_when: false
+
+    - name: Force shutdown VM
+      ansible.builtin.command:
+        cmd: VBoxManage controlvm "{{ vm_name }}" poweroff
+      when: vm_running.rc == 0 and force_shutdown
+      register: force_shutdown_result
+      changed_when: true
+      failed_when: false
+
+    - name: Wait for VM to shutdown
+      ansible.builtin.pause:
+        seconds: "{{ shutdown_wait_time }}"
+      when: vm_running.rc == 0
+
+    - name: Verify VM has stopped
+      ansible.builtin.shell:
+        cmd: VBoxManage list runningvms | grep -q "{{ vm_name }}"
+      register: vm_stopped
+      changed_when: false
+      failed_when: vm_stopped.rc == 0
+      retries: 3
+      delay: 5
+      until: vm_stopped.rc != 0
+      when: vm_running.rc == 0
+
+    - name: Start VM
+      ansible.builtin.command:
+        cmd: VBoxManage startvm "{{ vm_name }}" --type headless
+      register: vm_start
+      changed_when: true
+
+    - name: Wait for VM to start
+      ansible.builtin.pause:
+        seconds: "{{ startup_wait_time }}"
+
+    - name: Verify VM is running
+      ansible.builtin.shell:
+        cmd: VBoxManage list runningvms | grep -q "{{ vm_name }}"
+      register: vm_verify
+      changed_when: false
+      failed_when: vm_verify.rc != 0
+
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: "VM '{{ vm_name }}' has been successfully restarted"
