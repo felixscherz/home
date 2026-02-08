@@ -97,22 +97,6 @@
         state: restarted
         name: nginx
 
-- name: Setup daily sleep cron job
-  hosts: home
-  vars_files:
-    - vars.yml
-  vars:
-    ansible_become_pass: "{{ home.become_password }}"
-  tasks:
-    - name: Add daily sleep cron job for server sleep
-      become: true
-      ansible.builtin.cron:
-        name: "Send server to sleep for 8 hours"
-        hour: "22"
-        user: root
-        job: "sudo rtcwake -m mem -s 28800"
-        state: absent
-
 
 - name: Setup paperless
   hosts: home
