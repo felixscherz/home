@@ -1,10 +1,19 @@
 # {{ ansible_managed }}
 [Interface]
 Address = 10.0.0.8/32
+MTU = 1380
 
 PostUp = wg set %i private-key /etc/wireguard/privatekey
 # Also ping the vpn server to ensure the tunnel is initialized
 PostUp = ping -c1 10.0.0.1
+# Allow traffic from WireGuard to Docker containers and back
+PostUp = iptables -A FORWARD -i %i -m conntrack --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT
+PostUp = iptables -A FORWARD -o %i -m conntrack --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT
+PostUp = iptables -A INPUT -i %i -j ACCEPT
+
+PostDown = iptables -D FORWARD -i %i -m conntrack --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT
+PostDown = iptables -D FORWARD -o %i -m conntrack --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT
+PostDown = iptables -D INPUT -i %i -j ACCEPT
 
 [Peer]
 PublicKey = {{ server_pubkey }}

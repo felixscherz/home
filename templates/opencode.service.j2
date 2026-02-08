@@ -7,8 +7,8 @@ After=network-online.target
 Type=simple
 User=felix
 WorkingDirectory=/home/felix/repositories
-Environment="OPENCODE_SERVER_USERNAME={{ home.opencode.username }}"
-Environment="OPENCODE_SERVER_PASSWORD={{ home.opencode.password }}"
+# Environment="OPENCODE_SERVER_USERNAME={{ home.opencode.username }}"
+# Environment="OPENCODE_SERVER_PASSWORD={{ home.opencode.password }}"
 ExecStart=/home/felix/.opencode/bin/opencode web --hostname {{ home.opencode.hostname }} --port {{ home.opencode.port }}
 Restart=always
 RestartSec=10

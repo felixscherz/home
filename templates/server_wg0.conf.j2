@@ -4,25 +4,25 @@ Address = 10.0.0.1/24
 ListenPort = 51820
 PrivateKey = {{ server_privkey }}
 
-MTU = 1420
-PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o wg0 -s 10.0.0.0/24 -j RETURN; iptables -t nat -A POSTROUTING -o wg0 -j MASQUERADE
-PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o wg0 -s 10.0.0.0/24 -j RETURN; iptables -t nat -D POSTROUTING -o wg0 -j MASQUERADE
+MTU = 1380
+PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o {{ proxy.external_interface }} -s 10.0.0.0/24 -j MASQUERADE
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o {{ proxy.external_interface }} -s 10.0.0.0/24 -j MASQUERADE
 
 [Peer]
 PublicKey = {{ hostvars['server'].pubkey }}
-AllowedIPs = 10.0.0.8
+AllowedIPs = 10.0.0.8/32
 
 [Peer]
 # slzb
 PublicKey = 7g7yND4KvEs8kadw7hkMhVeQqWgbkhA77AAuiMwPZjU=
-AllowedIPs = 10.0.0.9
+AllowedIPs = 10.0.0.9/32
 
 [Peer]
 # homeassistant
 PublicKey = iU+82jLBeXf3jyfnjQT5kTiI9+mfZ6NvkBd6KY1Kd14=
-AllowedIPs = 10.0.0.10
+AllowedIPs = 10.0.0.10/32
 
 [Peer]
 # phone
 PublicKey = /SapjOXLgnmImwiV9lOG88AqvIIR/xKHlS8W4Z4lLhg=
-AllowedIPs = 10.0.0.11
+AllowedIPs = 10.0.0.11/32
