@@ -62,6 +62,51 @@
     - name: Install python3-certbot-nginx
       ansible.builtin.package:
         name: python3-certbot-nginx
+    - name: Create nginx SSL directory
+      ansible.builtin.file:
+        path: /etc/nginx/ssl
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+    - name: Generate CA private key
+      ansible.builtin.command:
+        cmd: openssl genrsa -out /etc/nginx/ssl/ca.key 4096
+        creates: /etc/nginx/ssl/ca.key
+    - name: Generate CA certificate
+      ansible.builtin.command:
+        cmd: openssl req -new -x509 -days 36500 -key /etc/nginx/ssl/ca.key -out /etc/nginx/ssl/ca.crt -subj "/C=DE/ST=State/L=City/O=felixscherz.me/CN=felixscherz.me CA"
+        creates: /etc/nginx/ssl/ca.crt
+    - name: Generate client private key
+      ansible.builtin.command:
+        cmd: openssl genrsa -out /etc/nginx/ssl/client.key 4096
+        creates: /etc/nginx/ssl/client.key
+    - name: Generate client CSR
+      ansible.builtin.command:
+        cmd: openssl req -new -key /etc/nginx/ssl/client.key -out /etc/nginx/ssl/client.csr -subj "/C=DE/ST=State/L=City/O=felixscherz.me/CN=OpenCode Client"
+        creates: /etc/nginx/ssl/client.csr
+    - name: Sign client certificate with CA
+      ansible.builtin.command:
+        cmd: openssl x509 -req -days 36500 -in /etc/nginx/ssl/client.csr -CA /etc/nginx/ssl/ca.crt -CAkey /etc/nginx/ssl/ca.key -set_serial 01 -out /etc/nginx/ssl/client.crt
+        creates: /etc/nginx/ssl/client.crt
+    - name: Set permissions on private keys
+      ansible.builtin.file:
+        path: "{{ item }}"
+        mode: '0600'
+        owner: root
+        group: root
+      loop:
+        - /etc/nginx/ssl/ca.key
+        - /etc/nginx/ssl/client.key
+    - name: Set permissions on certificates
+      ansible.builtin.file:
+        path: "{{ item }}"
+        mode: '0644'
+        owner: root
+        group: root
+      loop:
+        - /etc/nginx/ssl/ca.crt
+        - /etc/nginx/ssl/client.crt
     - name: Copy nginx configuration
       become: true
       ansible.builtin.copy:
@@ -84,11 +129,35 @@
           - mealie.felixscherz.me
           - -d
           - grafana.felixscherz.me
+          - -d
+          - opencode.felixscherz.me
           - --expand
           - -n
           - --agree-tos
           - --email
           - felixwscherz@gmail.com
+    - name: Create local certs directory
+      delegate_to: localhost
+      become: false
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/certs"
+        state: directory
+        mode: '0755'
+    - name: Fetch CA certificate to local machine
+      ansible.builtin.fetch:
+        src: /etc/nginx/ssl/ca.crt
+        dest: "{{ playbook_dir }}/certs/ca.crt"
+        flat: yes
+    - name: Fetch client certificate to local machine
+      ansible.builtin.fetch:
+        src: /etc/nginx/ssl/client.crt
+        dest: "{{ playbook_dir }}/certs/client.crt"
+        flat: yes
+    - name: Fetch client private key to local machine
+      ansible.builtin.fetch:
+        src: /etc/nginx/ssl/client.key
+        dest: "{{ playbook_dir }}/certs/client.key"
+        flat: yes
 
   handlers:
     - name: Restart nginx
