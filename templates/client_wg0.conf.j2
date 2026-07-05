@@ -4,8 +4,9 @@ Address = 10.0.0.8/32
 MTU = 1380
 
 PostUp = wg set %i private-key /etc/wireguard/privatekey
-# Also ping the vpn server to ensure the tunnel is initialized
-PostUp = ping -c1 10.0.0.1
+# Ping the VPN server to trigger the initial handshake; ignore failure so a
+# slow handshake doesn't kill the service on boot.
+PostUp = ping -c3 -W2 10.0.0.1 || true
 # Allow traffic from WireGuard to Docker containers and back
 PostUp = iptables -A FORWARD -i %i -m conntrack --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT
 PostUp = iptables -A FORWARD -o %i -m conntrack --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT
