@@ -53,9 +53,21 @@
       ansible.builtin.user:
         name: nginx
         shell: /bin/false
+    - name: Add nginx apt signing key
+      ansible.builtin.get_url:
+        url: https://nginx.org/keys/nginx_signing.key
+        dest: /etc/apt/keyrings/nginx.asc
+        mode: '0644'
+    - name: Add nginx apt repository
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/nginx.asc] https://nginx.org/packages/mainline/ubuntu noble nginx"
+        state: present
+        filename: nginx
     - name: Install nginx
       ansible.builtin.package:
         name: nginx
+        state: latest
+        update_cache: true
     - name: Install certbot
       ansible.builtin.package:
         name: certbot
@@ -131,6 +143,10 @@
           - grafana.felixscherz.me
           - -d
           - opencode.felixscherz.me
+          - -d
+          - smash.felixscherz.me
+          - -d
+          - stream-smash.felixscherz.me
           - --expand
           - -n
           - --agree-tos
