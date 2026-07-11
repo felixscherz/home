@@ -39,6 +39,7 @@
   become: true
   vars_files:
     - secrets.yml
+    - vars.yml
   tags:
     - proxy
   tasks:
@@ -119,6 +120,21 @@
       loop:
         - /etc/nginx/ssl/ca.crt
         - /etc/nginx/ssl/client.crt
+    - name: Install apache2-utils for htpasswd
+      ansible.builtin.package:
+        name: apache2-utils
+        state: present
+    - name: Create htpasswd file for smash
+      ansible.builtin.command:
+        cmd: htpasswd -bc /etc/nginx/smash.htpasswd {{ smash.auth.username }} {{ smash.auth.password }}
+      no_log: true
+      changed_when: true
+    - name: Set permissions on smash htpasswd file
+      ansible.builtin.file:
+        path: /etc/nginx/smash.htpasswd
+        owner: root
+        group: nginx
+        mode: '0640'
     - name: Copy nginx configuration
       become: true
       ansible.builtin.copy:
