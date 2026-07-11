@@ -8,6 +8,13 @@ MTU = 1380
 PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o {{ proxy.external_interface }} -s 10.0.0.0/24 -j MASQUERADE
 PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o {{ proxy.external_interface }} -s 10.0.0.0/24 -j MASQUERADE
 
+# smash WebRTC media: DNAT public UDP 10000-10004 to the Mac over wg0, then
+# MASQUERADE so OME replies through the VM (NAT symmetry for ICE). See VPN-MIGRATION.md.
+PostUp = iptables -t nat -A PREROUTING -i {{ proxy.external_interface }} -p udp --dport 10000:10004 -j DNAT --to-destination 10.0.0.20
+PostUp = iptables -t nat -A POSTROUTING -o %i -p udp -d 10.0.0.20 --dport 10000:10004 -j MASQUERADE
+PostDown = iptables -t nat -D PREROUTING -i {{ proxy.external_interface }} -p udp --dport 10000:10004 -j DNAT --to-destination 10.0.0.20
+PostDown = iptables -t nat -D POSTROUTING -o %i -p udp -d 10.0.0.20 --dport 10000:10004 -j MASQUERADE
+
 [Peer]
 PublicKey = {{ hostvars['server'].pubkey }}
 AllowedIPs = 10.0.0.8/32
@@ -26,3 +33,8 @@ AllowedIPs = 10.0.0.10/32
 # phone
 PublicKey = /SapjOXLgnmImwiV9lOG88AqvIIR/xKHlS8W4Z4lLhg=
 AllowedIPs = 10.0.0.11/32
+
+[Peer]
+# mac (smash streaming)
+PublicKey = DFLX66DMVY0HTU4bfekaFbl7bmODjmCFPv0oSsfuFAM=
+AllowedIPs = 10.0.0.20/32
