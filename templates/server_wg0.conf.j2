@@ -16,17 +16,13 @@ PostDown = iptables -t nat -D PREROUTING -i {{ proxy.external_interface }} -p ud
 PostDown = iptables -t nat -D POSTROUTING -o %i -p udp -d 10.0.0.20 --dport 10000:10004 -j MASQUERADE
 
 [Peer]
-PublicKey = {{ hostvars['server'].pubkey }}
-AllowedIPs = 10.0.0.8/32
-
-[Peer]
 # slzb
 PublicKey = 7g7yND4KvEs8kadw7hkMhVeQqWgbkhA77AAuiMwPZjU=
 AllowedIPs = 10.0.0.9/32
 
 [Peer]
 # homeassistant
-PublicKey = iU+82jLBeXf3jyfnjQT5kTiI9+mfZ6NvkBd6KY1Kd14=
+PublicKey = 0BeobnE6gZfMBj4ZRLU52/UdDhXenFLGxhTum9XVyGI=
 AllowedIPs = 10.0.0.10/32
 
 [Peer]
